@@ -1,0 +1,75 @@
+#!/bin/bash
+
+set -e
+
+# netcatコマンド
+# 動作環境によってオプションに差異があるらしい
+NETCAT_CMD=${NETCAT_CMD:-"nc -N"}
+
+# このシェルスクリプトのパス
+SH_PATH=$(realpath $0)
+# rubocop-daemonキャッシュディレクトリのパス
+# token, port, statusなどを参照するために必要
+CACHE_DIR=${CACHE_DIR:-$(realpath $(dirname ${SH_PATH})/../tmp/rubocop-daemon)}
+
+# デバッグモード
+# ./tmp/rubocop.debug.log に動作ログを出力する
+# DEBUG=1
+if [ "${DEBUG}" = 1 ] || [ -n "${DEBUGLOG}" ]; then
+  DEBUGLOG=${DEBUGLOG:-$(dirname ${CACHE_DIR})/rubocop.debug.log}
+fi
+
+# 作業ディレクトリを指定可能に
+if [ -n "${CWD}" ]; then
+  cd ${CWD}
+fi
+
+# デバッグログ出力
+if [ -n "${DEBUGLOG}" ]; then
+  cat << EOF >> ${DEBUGLOG}
+$(date +'%F %T')
+      NETCAT_CMD: $NETCAT_CMD
+        SH_PATH: $SH_PATH
+      CACHE_DIR: $CACHE_DIR
+            CWD: $CWD
+            pwd: $(pwd)
+EOF
+fi
+
+# 標準入力の読み取り
+# -s もしくは --stdin が指定されている場合に読み取る
+# ※vscode(ruby-rubocop)は --stdin でコードをチェックさせる
+# If -s or --stdin args are present, read stdin with `cat`
+for ARG in $@; do
+  if [ -z "$STDIN_CONTENT" ] && [ "$ARG" == "--stdin" ] || [ "$ARG" == "-s" ]; then
+    # Preserve final new lines when ingesting from STDIN
+    STDIN_CONTENT="$(cat; printf x)"
+    STDIN_CONTENT=${STDIN_CONTENT%x}
+  fi
+done
+
+# コンテナ内の作業ディレクトリのパス
+WORKDIR=${WORKDIR:-/workspace}
+# rubocop-daemonコマンドの構築
+COMMAND="$(cat ${CACHE_DIR}/token) ${WORKDIR} exec $@"
+
+# デバッグログ出力
+if [ -n "${DEBUGLOG}" ]; then
+  cat << EOF >> ${DEBUGLOG}
+           ARGS: $@
+        WORKDIR: $WORKDIR
+        COMMAND: $COMMAND
+           PORT: $(cat ${CACHE_DIR}/port)
+  STDIN_CONTENT:
+\`\`\`
+$STDIN_CONTENT
+\`\`\`
+EOF
+fi
+
+# rubocop実行
+# netcatでコンテナのrubocop-daemonにコマンドを送信
+rm -f ${CACHE_DIR}/status
+printf '%s\n%s' "${COMMAND}" "${STDIN_CONTENT}" | ${NETCAT_CMD} 127.0.0.1 $(cat ${CACHE_DIR}/port)
+
+exit $(cat ${CACHE_DIR}/status)

@@ -1,0 +1,9 @@
+version: "3.9"
+services:
+  rubocop:
+    build: .docker/rubocop-daemon
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./tmp/rubocop-daemon:/root/.cache/rubocop-daemon/workspace
+      - ./sample_app:/workspace

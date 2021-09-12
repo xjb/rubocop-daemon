@@ -1,0 +1,2 @@
+tmp/rubocop-daemon/*
+tmp/rubocop.debug.log
