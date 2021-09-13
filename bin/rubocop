@@ -8,9 +8,17 @@ NETCAT_CMD=${NETCAT_CMD:-"nc -N"}
 
 # このシェルスクリプトのパス
 SH_PATH=$(realpath $0)
+# ワークスペースルートの絶対パス
+WORKSPACE_ROOT=$(realpath $(dirname ${SH_PATH})/..)
+
+# コンテナ内の作業ディレクトリのパス
+# WORKDIR=/workspace
+# コンテナ内の作業ディレクトリにマウントしているローカルディレクトリのパス
+LOCALDIR=${WORKSPACE_ROOT}/sample_app
+
 # rubocop-daemonキャッシュディレクトリのパス
 # token, port, statusなどを参照するために必要
-CACHE_DIR=${CACHE_DIR:-$(realpath $(dirname ${SH_PATH})/../tmp/rubocop-daemon)}
+CACHE_DIR=${CACHE_DIR:-$(realpath ${WORKSPACE_ROOT}/tmp/rubocop-daemon)}
 
 # デバッグモード
 # ./tmp/rubocop.debug.log に動作ログを出力する
@@ -19,17 +27,13 @@ if [ "${DEBUG}" = 1 ] || [ -n "${DEBUGLOG}" ]; then
   DEBUGLOG=${DEBUGLOG:-$(dirname ${CACHE_DIR})/rubocop.debug.log}
 fi
 
-# 作業ディレクトリを指定可能に
-if [ -n "${CWD}" ]; then
-  cd ${CWD}
-fi
-
 # デバッグログ出力
 if [ -n "${DEBUGLOG}" ]; then
   cat << EOF >> ${DEBUGLOG}
 $(date +'%F %T')
-      NETCAT_CMD: $NETCAT_CMD
+     NETCAT_CMD: $NETCAT_CMD
         SH_PATH: $SH_PATH
+ WORKSPACE_ROOT: $WORKSPACE_ROOT
       CACHE_DIR: $CACHE_DIR
             CWD: $CWD
             pwd: $(pwd)
@@ -50,14 +54,26 @@ done
 
 # コンテナ内の作業ディレクトリのパス
 WORKDIR=${WORKDIR:-/workspace}
+# コンテナ内の作業ディレクトリにマウントしているローカルディレクトリのパス
+LOCALDIR=${LOCALDIR:-${WORKSPACE_ROOT}}
 # rubocop-daemonコマンドの構築
-COMMAND="$(cat ${CACHE_DIR}/token) ${WORKDIR} exec $@"
+# .rubocop.yml に設定したパスとマッチするよう、絶対パスのファイルパスはプロジェクトルートからの相対パスに置換
+# COMMAND="$(cat ${CACHE_DIR}/token) ${WORKDIR} exec $@"
+COMMAND="$(cat ${CACHE_DIR}/token) ${WORKDIR} exec"
+for ARG in $@; do
+  if [[ "$ARG" =~ ^/ ]] && [ -f "$ARG" ]; then
+    COMMAND="${COMMAND} $(realpath --relative-to=${LOCALDIR} ${ARG})"
+  else
+    COMMAND="${COMMAND} ${ARG}"
+  fi
+done
 
 # デバッグログ出力
 if [ -n "${DEBUGLOG}" ]; then
   cat << EOF >> ${DEBUGLOG}
            ARGS: $@
         WORKDIR: $WORKDIR
+       LOCALDIR: $LOCALDIR
         COMMAND: $COMMAND
            PORT: $(cat ${CACHE_DIR}/port)
   STDIN_CONTENT:
