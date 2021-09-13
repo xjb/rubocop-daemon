@@ -2,19 +2,22 @@
 
 set -e
 
-# netcatコマンド
-# 動作環境によってオプションに差異があるらしい
-NETCAT_CMD=${NETCAT_CMD:-"nc -N"}
-
 # このシェルスクリプトのパス
 SH_PATH=$(realpath $0)
 # ワークスペースルートの絶対パス
 WORKSPACE_ROOT=$(realpath $(dirname ${SH_PATH})/..)
 
-# コンテナ内の作業ディレクトリのパス
-# WORKDIR=/workspace
-# コンテナ内の作業ディレクトリにマウントしているローカルディレクトリのパス
-LOCALDIR=${WORKSPACE_ROOT}/sample_app
+# 作業ディレクトリをワークスペースルートに移動
+cd ${WORKSPACE_ROOT}
+
+# .envを読み込む
+if [ -f .env ]; then
+  source .env
+fi
+
+# netcatコマンド
+# 動作環境によってオプションに差異があるらしい
+NETCAT_CMD=${NETCAT_CMD:-"nc -N"}
 
 # rubocop-daemonキャッシュディレクトリのパス
 # token, port, statusなどを参照するために必要
