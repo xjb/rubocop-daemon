@@ -5,5 +5,5 @@ services:
     ports:
       - "3001:3001"
     volumes:
-      - ./tmp/rubocop-daemon:/root/.cache/rubocop-daemon/workspace
       - ./sample_app:/workspace
+      - ./sample_app/tmp/rubocop-daemon:/root/.cache/rubocop-daemon/workspace
